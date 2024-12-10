@@ -140,7 +140,7 @@ async def clear(ctx):
     else:
         await ctx.send("You don't have permissions to use that command.")
 
-# Função para iniciar um servidor HTTP simples
+# Function to start simple HTTP server
 def run_http_server():
     port = 8000
     server_address = ('', port)
