@@ -74,6 +74,7 @@ def convert_at_to_https(post_url):
     return post_url
 
 async def send_new_post(channel, post):
+    post_url = post.get('uri', '')
     post_url = convert_at_to_https(post_url)  # Convert the post URL if necessary
     try:
         await channel.send(post_url)
@@ -85,7 +86,6 @@ async def send_new_post(channel, post):
     author = "TFWiki"
     author_handle = "tfwiki.net"
     #author_avatar = author.get('avatar', '')  # URL profile photo
-    post_url = post.get('uri', '')
     #post_url = post.get('value', {}).get('uri', '')
     """
 
