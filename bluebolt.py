@@ -9,31 +9,62 @@ from http.server import SimpleHTTPRequestHandler, HTTPServer
 import threading
 
 # Bot config
-SLEEP_SECONDS = 10
-DISCORD_TOKEN = os.environ['DISCORD_TOKEN']
-BLUESKY_API_URL = os.environ['BLUESKY_API_URL']
-channel_id = int(os.environ['channel_id'])
+SLEEP_SECONDS = 300
+DID = "did:plc:dfkv7k7rxcrvaj7ncbvlnjy7" # tfwiki bluesky DID
+DISCORD_TOKEN = os.environ['BLUEBOLT_TOKEN']
+channel_id = int("1315876382257053746") # test-bloosk
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
+intents.messages = True
+intents.guild_messages = True
+intents.guilds = True
 
 bot = commands.Bot(command_prefix='!-', intents=intents)
 
 last_post_id = None
 timezone = pytz.timezone('Europe/London')
 
-
 def fetch_bluesky_posts():
-    try:
-        response = requests.get(BLUESKY_API_URL)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            print(f"Bluesky API Error: {response.status_code}")
+    my_posts = requests.get(
+        "https://bsky.social/xrpc/com.atproto.repo.listRecords",
+        params={
+            "repo": DID,
+            "collection": "app.bsky.feed.post",
+    })
+    return my_posts.json()
+
+def fetch_bluesky_posts_loop():
+    all_posts = []
+
+    more_posts = True
+    cursor = ''
+
+    while more_posts:
+        try:
+            post_batch = requests.get(
+                "https://bsky.social/xrpc/com.atproto.repo.listRecords",
+                params={
+                    "repo": DID,
+                    "collection": "app.bsky.actor.post",
+                    "cursor": cursor
+                },
+            ).json()
+
+        except Exception as e:
+            print(f"Error in accessing Bluesky API: {e}")
             return None
-    except Exception as e:
-        print(f"Error in accessing Bluesky API: {e}")
-        return None
+
+        all_posts.extend(post_batch['records'])
+
+        if 'cursor' in post_batch:
+            cursor = post_batch['cursor']
+        else:
+            more_posts = False
+
+    return all_posts
+
 
 def convert_at_to_https(post_url):
     if post_url.startswith('at://'):
@@ -43,14 +74,22 @@ def convert_at_to_https(post_url):
     return post_url
 
 async def send_new_post(channel, post):
-    post_content = post.get('post', {}).get('record', {}).get('text', "Post with no content available.")
-    author = post.get('post', {}).get('author', {})
-    author_handle = author.get('handle', 'Unknown')
-    author_avatar = author.get('avatar', '')  # URL profile photo
-    post_url = post.get('post', {}).get('uri', '')
-
     post_url = convert_at_to_https(post_url)  # Convert the post URL if necessary
+    try:
+        await channel.send(post_url)
+    except discord.DiscordException as e:
+        print(f"Error on sending message: {e}")
 
+    """
+    post_content = post.get('value', {}).get('text', "Post with no content available.")
+    author = "TFWiki"
+    author_handle = "tfwiki.net"
+    #author_avatar = author.get('avatar', '')  # URL profile photo
+    post_url = post.get('uri', '')
+    #post_url = post.get('value', {}).get('uri', '')
+    """
+
+    """
     embed = discord.Embed(
         description=post_content,
         color=0xff0053  # hex code of embed color
@@ -61,17 +100,17 @@ async def send_new_post(channel, post):
     embed.set_author(name=f"@{author_handle}", icon_url=bluesky_icon)
     
     # Add the image to the embed if available
-    embed_data = post.get('post', {}).get('embed', {})
-    if embed_data and embed_data.get('$type') == 'app.bsky.embed.images#view':
+    embed_data = post.get('value', {}).get('embed', {})
+    if embed_data and embed_data.get('$type') == 'app.bsky.embed.images':
         images = embed_data.get('images', [])
         if images:
             fullsize_image_url = images[0].get('fullsize', '')
             if fullsize_image_url.startswith(('http://', 'https://')):
                 embed.set_image(url=fullsize_image_url)
 
-    # Adiciona o ícone do autor como thumbnail ao lado da embed
-    if author_avatar.startswith(('http://', 'https://')):
-        embed.set_thumbnail(url=author_avatar)
+    # Add author avatar to embed
+    #if author_avatar.startswith(('http://', 'https://')):
+    #    embed.set_thumbnail(url=author_avatar)
 
 
     # Add the author's icon as a thumbnail next to the embed
@@ -82,9 +121,10 @@ async def send_new_post(channel, post):
         print(f"Message sent: {post_url}")
         
         # Adds a red heart reaction to the sent message
-        await message.add_reaction("❤️")
+        # await message.add_reaction("❤️")
     except discord.DiscordException as e:
         print(f"Error on sending message: {e}")
+"""
 
 # Global variable to store the timestamp of the last post
 last_post_timestamp = None
@@ -92,23 +132,23 @@ last_post_timestamp = None
 async def check_new_posts():
     global last_post_timestamp
     await bot.wait_until_ready()
-    
-    channel = bot.get_channel(channel_id)
 
+    channel = bot.get_channel(channel_id)
     if channel is None:
         print("Channel not found. Check the channel ID.")
         return
 
     while not bot.is_closed():
         posts_data = fetch_bluesky_posts()
-        if posts_data and 'feed' in posts_data:
-            for post_item in posts_data['feed']:
-                post_data = post_item.get('post', {})
+        #await channel.send(f"test bloosk retrieval: {posts_data['records'][0]}")
+        if posts_data and 'records' in posts_data:
+            for post_item in posts_data['records']:
+                post_data = post_item.get('value', {})
                 root = post_item.get('reply', {}).get('root', None)  # Check if there is an associated root
 
                 if root is None:  # Only processes if there is no root (normal posting)
-                    post_id = post_data.get('uri', '')
-                    post_timestamp = post_data.get('indexedAt', '')
+                    post_id = post_item.get('uri', '')
+                    post_timestamp = post_data.get('createdAt', '')
                     
                     # Converts post timestamp to datetime
                     try:
@@ -118,16 +158,18 @@ async def check_new_posts():
 
                     # Checks if the post is new and occurs after the last registered timestamp
                     if (last_post_timestamp is None) or (post_time > last_post_timestamp):
+                        await channel.send(f"Latest vs current timestamp: {last_post_timestamp} vs {post_time}")
                         last_post_timestamp = post_time  # Updates the timestamp of the last post processed
                         await send_new_post(channel, post_item)
         
-        await asyncio.sleep(SLEEP_SECONDS)  # Checks for new posts every 3 seconds.
+        await asyncio.sleep(SLEEP_SECONDS)  # Checks for new posts every SLEEP_SECONDS seconds.
 
 @bot.event
 async def on_ready():
     print(f'Bot connected as {bot.user}')
     bot.loop.create_task(check_new_posts())
 
+"""
 @bot.command(name="clean", help="Deletes all messages sent by the bot.")
 @commands.has_permissions(administrator=True)
 async def clear(ctx):
@@ -139,6 +181,7 @@ async def clear(ctx):
         await ctx.send(f"All bot messages deleted! ({len(deleted)} messages deleted.)")
     else:
         await ctx.send("You don't have permissions to use that command.")
+"""
 
 # Function to start simple HTTP server
 def run_http_server():
