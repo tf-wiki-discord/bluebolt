@@ -158,7 +158,7 @@ async def check_new_posts():
 
                     # Checks if the post is new and occurs after the last registered timestamp
                     if (last_post_timestamp is None) or (post_time > last_post_timestamp):
-                        await channel.send(f"Latest vs current timestamp: {last_post_timestamp} vs {post_time}")
+                        print(f"Latest vs current timestamp: {last_post_timestamp} vs {post_time}")
                         last_post_timestamp = post_time  # Updates the timestamp of the last post processed
                         await send_new_post(channel, post_item)
         
@@ -183,7 +183,6 @@ async def clear(ctx):
         await ctx.send("You don't have permissions to use that command.")
 """
 
-# Function to start simple HTTP server
 def run_http_server():
     port = 8000
     server_address = ('', port)
