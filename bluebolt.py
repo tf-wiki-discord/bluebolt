@@ -3,15 +3,18 @@ import requests
 import pytz
 import datetime
 import asyncio
+import threading
 import os
 from http.server import SimpleHTTPRequestHandler, HTTPServer
-import threading
+from dotenv import dotenv_values
+
 
 # Bot config
-SLEEP_SECONDS = 600
-DID = "did:plc:dfkv7k7rxcrvaj7ncbvlnjy7" # tfwiki bluesky DID
-DISCORD_TOKEN = os.environ['BLUEBOLT_TOKEN']
-channel_id = int("1315876382257053746") # test-bloosk
+config = dotenv_values(".env")
+SLEEP_SECONDS = int(config['SLEEP_SECONDS'])
+DID = config['DID'] # tfwiki bluesky DID
+DISCORD_TOKEN = config['BLUEBOLT_TOKEN']
+CHANNEL_ID = int(config['CHANNEL_ID']) # test-bloosk
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -58,7 +61,7 @@ async def check_new_posts():
     global last_post_timestamp
     await bot.wait_until_ready()
 
-    channel = bot.get_channel(channel_id)
+    channel = bot.get_channel(CHANNEL_ID)
     if channel is None:
         print("Channel not found. Check the channel ID.")
         return
