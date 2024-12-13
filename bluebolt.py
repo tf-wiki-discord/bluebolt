@@ -1,5 +1,4 @@
 import discord
-from discord.ext import commands
 import requests
 import pytz
 import datetime
@@ -9,7 +8,7 @@ from http.server import SimpleHTTPRequestHandler, HTTPServer
 import threading
 
 # Bot config
-SLEEP_SECONDS = 300
+SLEEP_SECONDS = 600
 DID = "did:plc:dfkv7k7rxcrvaj7ncbvlnjy7" # tfwiki bluesky DID
 DISCORD_TOKEN = os.environ['BLUEBOLT_TOKEN']
 channel_id = int("1315876382257053746") # test-bloosk
@@ -21,7 +20,7 @@ intents.messages = True
 intents.guild_messages = True
 intents.guilds = True
 
-bot = commands.Bot(command_prefix='!-', intents=intents)
+bot = discord.Client(intents=intents)
 
 last_post_id = None
 timezone = pytz.timezone('Europe/London')
@@ -34,37 +33,6 @@ def fetch_bluesky_posts():
             "collection": "app.bsky.feed.post",
     })
     return my_posts.json()
-
-def fetch_bluesky_posts_loop():
-    all_posts = []
-
-    more_posts = True
-    cursor = ''
-
-    while more_posts:
-        try:
-            post_batch = requests.get(
-                "https://bsky.social/xrpc/com.atproto.repo.listRecords",
-                params={
-                    "repo": DID,
-                    "collection": "app.bsky.actor.post",
-                    "cursor": cursor
-                },
-            ).json()
-
-        except Exception as e:
-            print(f"Error in accessing Bluesky API: {e}")
-            return None
-
-        all_posts.extend(post_batch['records'])
-
-        if 'cursor' in post_batch:
-            cursor = post_batch['cursor']
-        else:
-            more_posts = False
-
-    return all_posts
-
 
 def convert_at_to_https(post_url):
     if post_url.startswith('at://'):
@@ -81,50 +49,7 @@ async def send_new_post(channel, post):
     except discord.DiscordException as e:
         print(f"Error on sending message: {e}")
 
-    """
-    post_content = post.get('value', {}).get('text', "Post with no content available.")
-    author = "TFWiki"
-    author_handle = "tfwiki.net"
-    #author_avatar = author.get('avatar', '')  # URL profile photo
-    #post_url = post.get('value', {}).get('uri', '')
-    """
 
-    """
-    embed = discord.Embed(
-        description=post_content,
-        color=0xff0053  # hex code of embed color
-    )
-    
-    # Add the Bluesky icon next to the author's name
-    bluesky_icon = "https://bsky.app/static/favicon-16x16.png"
-    embed.set_author(name=f"@{author_handle}", icon_url=bluesky_icon)
-    
-    # Add the image to the embed if available
-    embed_data = post.get('value', {}).get('embed', {})
-    if embed_data and embed_data.get('$type') == 'app.bsky.embed.images':
-        images = embed_data.get('images', [])
-        if images:
-            fullsize_image_url = images[0].get('fullsize', '')
-            if fullsize_image_url.startswith(('http://', 'https://')):
-                embed.set_image(url=fullsize_image_url)
-
-    # Add author avatar to embed
-    #if author_avatar.startswith(('http://', 'https://')):
-    #    embed.set_thumbnail(url=author_avatar)
-
-
-    # Add the author's icon as a thumbnail next to the embed
-    embed.description += f"\n\n[View on BlueSky]({post_url})"
-
-    try:
-        message = await channel.send(embed=embed)
-        print(f"Message sent: {post_url}")
-        
-        # Adds a red heart reaction to the sent message
-        # await message.add_reaction("❤️")
-    except discord.DiscordException as e:
-        print(f"Error on sending message: {e}")
-"""
 
 # Global variable to store the timestamp of the last post
 last_post_timestamp = None
@@ -168,20 +93,6 @@ async def check_new_posts():
 async def on_ready():
     print(f'Bot connected as {bot.user}')
     bot.loop.create_task(check_new_posts())
-
-"""
-@bot.command(name="clean", help="Deletes all messages sent by the bot.")
-@commands.has_permissions(administrator=True)
-async def clear(ctx):
-    if ctx.author.guild_permissions.administrator:
-        channel = ctx.channel
-        def is_bot_msg(msg):
-            return msg.author == bot.user
-        deleted = await channel.purge(limit=100, check=is_bot_msg, bulk=True)
-        await ctx.send(f"All bot messages deleted! ({len(deleted)} messages deleted.)")
-    else:
-        await ctx.send("You don't have permissions to use that command.")
-"""
 
 def run_http_server():
     port = 8000
