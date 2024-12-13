@@ -15,7 +15,7 @@ SLEEP_SECONDS = int(os.getenv('SLEEP_SECONDS'))
 DID = os.getenv('DID') # tfwiki bluesky DID
 DISCORD_TOKEN = os.getenv('BLUEBOLT_TOKEN')
 CHANNEL_ID = int(os.getenv('LIVE_CHANNEL_ID')) # bluesky
-#CHANNEL_ID = int(os.getenv('CHANNEL_ID')) # test-bloosk
+#CHANNEL_ID = int(os.getenv('TEST_CHANNEL_ID')) # coding
 
 intents = discord.Intents.default()
 intents.message_content = True
