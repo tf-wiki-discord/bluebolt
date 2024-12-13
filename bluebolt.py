@@ -6,15 +6,15 @@ import asyncio
 import threading
 import os
 from http.server import SimpleHTTPRequestHandler, HTTPServer
-from dotenv import dotenv_values
+from dotenv import load_dotenv
 
 
 # Bot config
-config = dotenv_values(".env")
-SLEEP_SECONDS = int(config['SLEEP_SECONDS'])
-DID = config['DID'] # tfwiki bluesky DID
-DISCORD_TOKEN = config['BLUEBOLT_TOKEN']
-CHANNEL_ID = int(config['CHANNEL_ID']) # test-bloosk
+load_dotenv()
+SLEEP_SECONDS = int(os.getenv('SLEEP_SECONDS'))
+DID = os.getenv('DID') # tfwiki bluesky DID
+DISCORD_TOKEN = os.getenv('BLUEBOLT_TOKEN')
+CHANNEL_ID = int(os.getenv('CHANNEL_ID')) # test-bloosk
 
 intents = discord.Intents.default()
 intents.message_content = True
