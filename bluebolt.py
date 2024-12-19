@@ -30,13 +30,13 @@ last_post_id = None
 timezone = pytz.timezone('Europe/London')
 
 def fetch_bluesky_posts():
-    my_posts = requests.get(
+    posts = requests.get(
         "https://bsky.social/xrpc/com.atproto.repo.listRecords",
         params={
             "repo": DID,
             "collection": "app.bsky.feed.post",
     })
-    return my_posts.json()
+    return posts.json()
 
 def convert_at_to_https(post_url):
     if post_url.startswith('at://'):
@@ -69,13 +69,12 @@ async def check_new_posts():
 
     while not bot.is_closed():
         posts_data = fetch_bluesky_posts()
-        #await channel.send(f"test bloosk retrieval: {posts_data['records'][0]}")
         if posts_data and 'records' in posts_data:
             for post_item in posts_data['records']:
                 post_data = post_item.get('value', {})
-                root = post_item.get('reply', {}).get('root', None)  # Check if there is an associated root
-
-                if root is None:  # Only processes if there is no root (normal posting)
+                is_reply = post_item.get('reply', {})  # Check if there's a reply
+                
+                if not is_reply:  # Only processes if there is no reply
                     post_id = post_item.get('uri', '')
                     post_timestamp = post_data.get('createdAt', '')
                     
