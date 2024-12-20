@@ -72,7 +72,7 @@ async def check_new_posts():
         if posts_data and 'records' in posts_data:
             for post_item in posts_data['records']:
                 post_data = post_item.get('value', {})
-                is_reply = post_item.get('reply', {})  # Check if there's a reply
+                is_reply = post_data.get('reply', {})  # Check if there's a reply
                 
                 if not is_reply:  # Only processes if there is no reply
                     post_id = post_item.get('uri', '')
