@@ -104,7 +104,7 @@ async def on_ready():
     bot.loop.create_task(check_new_posts())
 
 def run_http_server():
-    port = 8000
+    port = 8080
     server_address = ('', port)
     httpd = HTTPServer(server_address, SimpleHTTPRequestHandler)
     print(f"HTTP server running on port {port}")
