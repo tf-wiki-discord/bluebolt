@@ -70,6 +70,8 @@ async def check_new_posts():
     while not bot.is_closed():
         posts_data = fetch_bluesky_posts()
         if posts_data and 'records' in posts_data:
+            # Since posts are in reverse chronological order (newest first),
+            # we only need to check the first non-reply post
             for post_item in posts_data['records']:
                 post_data = post_item.get('value', {})
                 is_reply = post_data.get('reply', {})  # Check if there's a reply
@@ -89,6 +91,10 @@ async def check_new_posts():
                         print(f"Latest vs current timestamp: {last_post_timestamp} vs {post_time}")
                         last_post_timestamp = post_time  # Updates the timestamp of the last post processed
                         await send_new_post(channel, post_item)
+                    
+                    # Break after processing the first non-reply post (newest non-reply)
+                    # to avoid reprocessing old posts
+                    break
         
         await asyncio.sleep(SLEEP_SECONDS)  # Checks for new posts every SLEEP_SECONDS seconds.
 
