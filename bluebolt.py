@@ -30,12 +30,14 @@ last_post_id = None
 timezone = pytz.timezone('Europe/London')
 
 def fetch_bluesky_posts():
+    print(f"Fetching posts for DID: {DID}")
     posts = requests.get(
         "https://bsky.social/xrpc/com.atproto.repo.listRecords",
         params={
             "repo": DID,
             "collection": "app.bsky.feed.post",
     })
+    print(f"Response status: {posts.status_code}")
     return posts.json()
 
 def convert_at_to_https(post_url):
@@ -48,8 +50,10 @@ def convert_at_to_https(post_url):
 async def send_new_post(channel, post):
     post_url = post.get('uri', '')
     post_url = convert_at_to_https(post_url)  # Convert the post URL if necessary
+    print(f"Sending post to Discord: {post_url}")
     try:
         await channel.send(post_url)
+        print(f"Successfully sent post!")
     except discord.DiscordException as e:
         print(f"Error on sending message: {e}")
 
@@ -66,36 +70,61 @@ async def check_new_posts():
     if channel is None:
         print("Channel not found. Check the channel ID.")
         return
+    else:
+        print(f"Channel found: {channel.name} (ID: {channel.id})")
 
     while not bot.is_closed():
-        posts_data = fetch_bluesky_posts()
-        if posts_data and 'records' in posts_data:
-            # Since posts are in reverse chronological order (newest first),
-            # we only need to check the first non-reply post
-            for post_item in posts_data['records']:
-                post_data = post_item.get('value', {})
-                is_reply = post_data.get('reply', {})  # Check if there's a reply
+        print(f"\n--- Checking for new posts at {datetime.datetime.now()} ---")
+        try:
+            posts_data = fetch_bluesky_posts()
+            print(f"Posts data keys: {posts_data.keys() if posts_data else 'None'}")
+            
+            if posts_data and 'records' in posts_data:
+                print(f"Found {len(posts_data['records'])} total records")
                 
-                if not is_reply:  # Only processes if there is no reply
-                    post_id = post_item.get('uri', '')
+                # Since posts are in reverse chronological order (newest first),
+                # we only need to check the first non-reply post
+                for i, post_item in enumerate(posts_data['records']):
+                    post_data = post_item.get('value', {})
+                    is_reply = post_data.get('reply', {})  # Check if there's a reply
                     post_timestamp = post_data.get('createdAt', '')
                     
-                    # Converts post timestamp to datetime
-                    try:
-                        post_time = datetime.datetime.fromisoformat(post_timestamp.replace('Z', '+00:00'))
-                    except ValueError:
-                        continue
-
-                    # Checks if the post is new and occurs after the last registered timestamp
-                    if (last_post_timestamp is None) or (post_time > last_post_timestamp):
-                        print(f"Latest vs current timestamp: {last_post_timestamp} vs {post_time}")
-                        last_post_timestamp = post_time  # Updates the timestamp of the last post processed
-                        await send_new_post(channel, post_item)
+                    print(f"Post {i}: timestamp={post_timestamp}, is_reply={bool(is_reply)}")
                     
-                    # Break after processing the first non-reply post (newest non-reply)
-                    # to avoid reprocessing old posts
-                    break
+                    if not is_reply:  # Only processes if there is no reply
+                        post_id = post_item.get('uri', '')
+                        
+                        # Converts post timestamp to datetime
+                        try:
+                            post_time = datetime.datetime.fromisoformat(post_timestamp.replace('Z', '+00:00'))
+                        except ValueError as e:
+                            print(f"Error parsing timestamp: {e}")
+                            continue
+
+                        # Checks if the post is new and occurs after the last registered timestamp
+                        if (last_post_timestamp is None):
+                            print(f"First run - initializing with timestamp: {post_time}")
+                            last_post_timestamp = post_time
+                            print(f"Skipping initial post to avoid reposting old content")
+                        elif (post_time > last_post_timestamp):
+                            print(f"NEW POST FOUND! Latest: {last_post_timestamp} vs Current: {post_time}")
+                            last_post_timestamp = post_time  # Updates the timestamp of the last post processed
+                            await send_new_post(channel, post_item)
+                        else:
+                            print(f"Post is not newer. Latest: {last_post_timestamp} vs Current: {post_time}")
+                        
+                        # Break after processing the first non-reply post (newest non-reply)
+                        # to avoid reprocessing old posts
+                        break
+            else:
+                print("No records found in response or invalid response")
+                
+        except Exception as e:
+            print(f"Error in check_new_posts: {e}")
+            import traceback
+            traceback.print_exc()
         
+        print(f"Sleeping for {SLEEP_SECONDS} seconds...")
         await asyncio.sleep(SLEEP_SECONDS)  # Checks for new posts every SLEEP_SECONDS seconds.
 
 @bot.event
@@ -104,7 +133,7 @@ async def on_ready():
     bot.loop.create_task(check_new_posts())
 
 def run_http_server():
-    port = 8080
+    port = 8000
     server_address = ('', port)
     httpd = HTTPServer(server_address, SimpleHTTPRequestHandler)
     print(f"HTTP server running on port {port}")
