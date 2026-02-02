@@ -61,9 +61,10 @@ async def send_new_post(channel, post):
 
 # Global variable to store the timestamp of the last post
 last_post_timestamp = None
+first_check = True
 
 async def check_new_posts():
-    global last_post_timestamp
+    global last_post_timestamp, first_check
     await bot.wait_until_ready()
 
     channel = bot.get_channel(CHANNEL_ID)
@@ -102,10 +103,11 @@ async def check_new_posts():
                             continue
 
                         # Checks if the post is new and occurs after the last registered timestamp
-                        if (last_post_timestamp is None):
-                            print(f"First run - initializing with timestamp: {post_time}")
+                        if first_check:
+                            print(f"First check - initializing with timestamp: {post_time} and posting it")
                             last_post_timestamp = post_time
-                            print(f"Skipping initial post to avoid reposting old content")
+                            await send_new_post(channel, post_item)
+                            first_check = False
                         elif (post_time > last_post_timestamp):
                             print(f"NEW POST FOUND! Latest: {last_post_timestamp} vs Current: {post_time}")
                             last_post_timestamp = post_time  # Updates the timestamp of the last post processed
