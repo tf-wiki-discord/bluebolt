@@ -1,5 +1,5 @@
 import discord
-import requests
+import aiohttp
 import pytz
 import datetime
 import asyncio
@@ -29,24 +29,24 @@ first_check = True
 timezone = pytz.timezone('Europe/London')
 
 
-def fetch_bluesky_posts():
+async def fetch_bluesky_posts():
     print(f"Fetching posts for DID: {DID}")
-    posts = requests.get(
-        "https://bsky.social/xrpc/com.atproto.repo.listRecords",
-        params={
-            "repo": DID,
-            "collection": "app.bsky.feed.post",
-            "reverse": "true",  # FIX: ensures newest posts come first
-        }
-    )
-    print(f"Response status: {posts.status_code}")
-    return posts.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            "https://bsky.social/xrpc/com.atproto.repo.listRecords",
+            params={
+                "repo": DID,
+                "collection": "app.bsky.feed.post",
+                # No "reverse" param — default order is newest-first
+            }
+        ) as response:
+            print(f"Response status: {response.status}")
+            return await response.json()
 
 
 def convert_at_to_https(post_url):
     """Converts an at:// URI to a bsky.app HTTPS URL for any DID type."""
     if post_url.startswith('at://'):
-        # FIX: handle all DID types, not just did:plc
         parts = post_url[len('at://'):].split('/')
         # parts = [did, 'app.bsky.feed.post', rkey]
         if len(parts) == 3:
@@ -80,7 +80,7 @@ async def check_new_posts():
     while not bot.is_closed():
         print(f"\n--- Checking for new posts at {datetime.datetime.now()} ---")
         try:
-            posts_data = fetch_bluesky_posts()
+            posts_data = await fetch_bluesky_posts()
             print(f"Posts data keys: {posts_data.keys() if posts_data else 'None'}")
 
             if posts_data and 'records' in posts_data:
@@ -103,8 +103,6 @@ async def check_new_posts():
                             continue
 
                         if first_check:
-                            # FIX: on first run, just record the timestamp without posting,
-                            # so the bot doesn't re-announce the latest post on every restart.
                             print(f"First check — storing latest timestamp: {post_time} (not reposting)")
                             last_post_timestamp = post_time
                             first_check = False
@@ -131,7 +129,7 @@ async def check_new_posts():
 @bot.event
 async def on_ready():
     print(f'Bot connected as {bot.user}')
-    bot.loop.create_task(check_new_posts())
+    asyncio.create_task(check_new_posts())
 
 
 def run_http_server():
@@ -143,7 +141,7 @@ def run_http_server():
 
 
 if __name__ == "__main__":
-    # FIX: run HTTP server in background thread, keep bot on main thread
+    # HTTP server runs in background thread, bot stays on main thread
     http_thread = threading.Thread(target=run_http_server, daemon=True)
     http_thread.start()
 
