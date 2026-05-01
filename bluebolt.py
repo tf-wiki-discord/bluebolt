@@ -115,6 +115,7 @@ async def check_new_posts():
                         if first_check:
                             print(f"First check — storing latest timestamp: {post_time} (not reposting)")
                             last_post_timestamp = post_time
+                            await send_new_post(channel, post_item) # hack to get us back on track
                             first_check = False
                         elif post_time > last_post_timestamp:
                             print(f"New post found! {last_post_timestamp} -> {post_time}")
