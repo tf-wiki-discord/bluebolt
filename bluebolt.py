@@ -37,7 +37,6 @@ async def fetch_bluesky_posts():
             params={
                 "repo": DID,
                 "collection": "app.bsky.feed.post",
-                # No "reverse" param — default order is newest-first
             }
         ) as response:
             print(f"Response status: {response.status}")
@@ -86,12 +85,23 @@ async def check_new_posts():
             if posts_data and 'records' in posts_data:
                 print(f"Found {len(posts_data['records'])} total records")
 
+                # Log first 5 posts for diagnostics regardless of reply status
+                print("=== First 5 records (diagnostic) ===")
+                for i, post_item in enumerate(posts_data['records'][:5]):
+                    post_data = post_item.get('value', {})
+                    is_reply = post_data.get('reply', {})
+                    post_timestamp = post_data.get('createdAt', '')
+                    post_uri = post_item.get('uri', '')
+                    print(f"  [{i}] uri={post_uri}, timestamp={post_timestamp}, is_reply={bool(is_reply)}")
+                print("=====================================")
+
                 for i, post_item in enumerate(posts_data['records']):
                     post_data = post_item.get('value', {})
                     is_reply = post_data.get('reply', {})
                     post_timestamp = post_data.get('createdAt', '')
+                    post_uri = post_item.get('uri', '')
 
-                    print(f"Post {i}: timestamp={post_timestamp}, is_reply={bool(is_reply)}")
+                    print(f"Post {i}: uri={post_uri}, timestamp={post_timestamp}, is_reply={bool(is_reply)}")
 
                     if not is_reply:
                         try:
@@ -133,7 +143,7 @@ async def on_ready():
 
 
 def run_http_server():
-    port = 8000
+    port = 8080  # Matches fly.toml internal_port
     server_address = ('', port)
     httpd = HTTPServer(server_address, SimpleHTTPRequestHandler)
     print(f"HTTP server running on port {port}")
